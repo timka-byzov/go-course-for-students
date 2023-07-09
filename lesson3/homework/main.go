@@ -20,7 +20,7 @@ type Options struct {
 }
 
 const (
-	DBlockSize int = 2
+	DBlockSize int = 1
 )
 
 const (
@@ -58,6 +58,7 @@ func (rd *IOReader) Read() ([]byte, error) {
 	for rd.opts.Limit == -1 || bytesReaded < rd.opts.Limit+rd.opts.Offset {
 		chunkBuffer := make([]byte, rd.opts.BlockSize)
 		n, readErr := os.Stdin.Read(chunkBuffer)
+
 		if readErr != nil && readErr != io.EOF {
 			return nil, fmt.Errorf("ошибка чтения из консоли %w", readErr)
 		}
@@ -65,9 +66,13 @@ func (rd *IOReader) Read() ([]byte, error) {
 		bytesReaded += n
 		buffer = append(buffer, chunkBuffer[:n]...)
 
-		if n < rd.opts.BlockSize {
+		if readErr == io.EOF {
 			break
 		}
+
+		// if n < rd.opts.BlockSize {
+		// 	break
+		// }
 	}
 
 	buffer = buffer[rd.opts.Offset:]
@@ -199,6 +204,9 @@ func NewConverison() Conversion {
 			return bytes.ToLower(b)
 		},
 		"trim": Trim,
+		"": func(b []byte) []byte {
+			return b
+		},
 	}
 
 	return Conversion{convFunc}
