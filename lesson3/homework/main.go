@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 )
@@ -39,9 +40,7 @@ type Writer interface {
 }
 
 type IOReader struct {
-	BlockSize int
-	Offset    int
-	Limit     int
+	opts *Options
 }
 
 func (rd IOReader) Read(limit int, offset int) ([]byte, error) {
@@ -52,9 +51,10 @@ func (rd IOReader) Read(limit int, offset int) ([]byte, error) {
 	endLine := false
 
 	for (bytesReaded < limit+offset || limit == -1) && !endLine {
-		chunkBuffer := make([]byte, rd.BlockSize)
-		n, err := os.Stdin.Read(chunkBuffer)
+		chunkBuffer := make([]byte, rd.opts.BlockSize)
+		n, readErr := os.Stdin.Read(chunkBuffer)
 		if err != nil {
+			err = readErr
 			break
 		}
 
@@ -73,15 +73,46 @@ func (rd IOReader) Read(limit int, offset int) ([]byte, error) {
 	return buffer, err
 }
 
-// type FileReader struct {
-// 	IOReader
-// 	ifName string
-// 	ofname string
-// }
+type FileReader struct {
+	opts *Options
+}
 
-// func (fr FileReader) OffsetRead(offset int) {
+func (fr FileReader) Read(limit int, offset int) ([]byte, error) {
+	var err error
 
-// }
+	exPath, _ := os.Getwd()
+	fileName := exPath + "\\" + "in.txt"
+
+	inputFile, err := os.Open(fileName)
+	// todo: добавить wrapper
+
+	buffer := []byte{}
+	bytesReaded := 0
+
+	for bytesReaded < limit+offset || limit == -1 {
+
+		chunkBuffer := make([]byte, fr.opts.BlockSize)
+
+		n, readErr := inputFile.Read(chunkBuffer)
+		if readErr != nil && readErr != io.EOF {
+			break
+		}
+
+		bytesReaded += n
+		for i := 0; i < n; i++ {
+			if chunkBuffer[i] == EndLine || chunkBuffer[i] == Empty || chunkBuffer[i] == CarriegeReturn {
+				break
+			}
+			buffer = append(buffer, chunkBuffer[i])
+		}
+
+		if readErr == io.EOF {
+			break
+		}
+
+	}
+	return buffer, err
+}
 
 func ParseFlags() (*Options, error) {
 	var opts Options
@@ -111,8 +142,12 @@ func main() {
 
 	fmt.Println(opts, err)
 
-	var IOReader Reader = IOReader{BlockSize: opts.BlockSize, Offset: opts.Offset, Limit: opts.Limit}
-	buffer, err := IOReader.Read(5, 10)
+	// var IOReader Reader = IOReader{opts}
+	// buffer, err := IOReader.Read(5, 10)
+	// fmt.Println(string(buffer), err)
+
+	var fileReader Reader = FileReader{opts}
+	buffer, err := fileReader.Read(2, 0)
 	fmt.Println(string(buffer), err)
 
 	// todo: implement the functional requirements described in read.me
