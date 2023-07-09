@@ -177,12 +177,17 @@ type Conversion struct {
 	convFunc map[string]func([]byte) []byte
 }
 
-func (cv Conversion) ApplyConversion(conversionName string, b []byte) ([]byte, error) {
-	f, ok := cv.convFunc[conversionName]
-	if ok {
-		return f(b), nil
+func (cv Conversion) ApplyConversions(b []byte, conversios []string) ([]byte, error) {
+	for _, conv := range conversios {
+		f, ok := cv.convFunc[conv]
+		if ok {
+			b = f(b)
+		} else {
+			return nil, fmt.Errorf("нет такого преобразования %s", conv)
+		}
 	}
-	return nil, fmt.Errorf("нет такого преобразования %s", conversionName)
+
+	return b, nil
 }
 
 func Trim(b []byte) []byte {
@@ -203,7 +208,7 @@ func NewConverison() Conversion {
 		"lower_case": func(b []byte) []byte {
 			return bytes.ToLower(b)
 		},
-		"trim": Trim,
+		"trim_spaces": Trim,
 		"": func(b []byte) []byte {
 			return b
 		},
@@ -249,11 +254,9 @@ func main() {
 	}
 
 	conversion := NewConverison()
-	for _, conv := range opts.Convesrions {
-		data, err = conversion.ApplyConversion(conv, data)
-		if err != nil {
-			panic(err)
-		}
+	data, err = conversion.ApplyConversions(data, opts.Convesrions)
+	if err != nil {
+		panic(err)
 	}
 
 	writeErr := writer.Write(data)
