@@ -24,6 +24,12 @@ const (
 )
 
 const (
+	upper_case_flag  = "upper_case"
+	lower_case_flag  = "lower_case"
+	trim_spaces_flag = "trim_spaces"
+)
+
+const (
 	EndLine        byte = 0xa
 	CarriegeReturn byte = 0xd
 	Empty          byte = 0x0
@@ -165,8 +171,6 @@ func ParseFlags() (*Options, error) {
 	flag.IntVar(&opts.BlockSize, "block-size", DBlockSize, "Block-size")
 	flag.StringVar(&conversions, "conv", "", "Conversions")
 
-	// TODO: parse and validate all flags
-
 	flag.Parse()
 	opts.Convesrions = strings.Split(conversions, ",")
 
@@ -177,8 +181,27 @@ type Conversion struct {
 	convFunc map[string]func([]byte) []byte
 }
 
+func HasLowerUpper(conversios []string) bool {
+	lower, upper := false, false
+	for _, v := range conversios {
+		if v == upper_case_flag {
+			upper = true
+		}
+
+		if v == lower_case_flag {
+			lower = true
+		}
+	}
+
+	return upper && lower
+}
+
 func (cv Conversion) ApplyConversions(b []byte, conversios []string) ([]byte, error) {
+	if HasLowerUpper(conversios) {
+		return nil, fmt.Errorf("lower_case и upper_case вместе")
+	}
 	for _, conv := range conversios {
+
 		f, ok := cv.convFunc[conv]
 		if ok {
 			b = f(b)
@@ -193,22 +216,25 @@ func (cv Conversion) ApplyConversions(b []byte, conversios []string) ([]byte, er
 func Trim(b []byte) []byte {
 	i := 0
 	j := len(b) - 1
-	for ; i < len(b) && unicode.IsSpace(rune(b[i])); i++ {
+
+	for ; i < len(b) && (unicode.IsSpace(rune(b[i]))); i++ {
 	}
-	for ; j >= i && unicode.IsSpace(rune(b[j])); j-- {
+	for ; j >= i && (unicode.IsSpace(rune(b[j])) || b[j] == '\u00E2'); j-- {
 	}
-	return b[i : j+1]
+	b = b[i : j+1]
+	b = bytes.ReplaceAll(b, []byte("\u2028"), nil)
+	return b
 }
 
 func NewConverison() Conversion {
 	convFunc := map[string]func([]byte) []byte{
-		"upper_case": func(b []byte) []byte {
+		upper_case_flag: func(b []byte) []byte {
 			return bytes.ToUpper(b)
 		},
-		"lower_case": func(b []byte) []byte {
+		lower_case_flag: func(b []byte) []byte {
 			return bytes.ToLower(b)
 		},
-		"trim_spaces": Trim,
+		trim_spaces_flag: Trim,
 		"": func(b []byte) []byte {
 			return b
 		},
