@@ -49,39 +49,38 @@ type IOWriter struct {
 }
 
 func (rd *IOReader) Read() ([]byte, error) {
-	var err error
 
 	buffer := []byte{}
 	bytesReaded := 0
-	endLine := false
 
-	for (rd.opts.Limit == -1 || bytesReaded < rd.opts.Limit+rd.opts.Offset) && !endLine {
+	for rd.opts.Limit == -1 || bytesReaded < rd.opts.Limit+rd.opts.Offset {
 		chunkBuffer := make([]byte, rd.opts.BlockSize)
 		n, readErr := os.Stdin.Read(chunkBuffer)
-		if err != nil {
-			err = readErr
-			break
+		if readErr != nil && readErr != io.EOF {
+			return nil, fmt.Errorf("ошибка чтения из консоли %w", readErr)
 		}
 
 		bytesReaded += n
+		buffer = append(buffer, chunkBuffer[:n]...)
 
-		for i := 0; i < n; i++ {
-			if chunkBuffer[i] == EndLine || chunkBuffer[i] == Empty || chunkBuffer[i] == CarriegeReturn {
-				endLine = true
-				break
-			}
-			buffer = append(buffer, chunkBuffer[i])
+		if n < rd.opts.BlockSize {
+			break
 		}
 	}
 
 	buffer = buffer[rd.opts.Offset:]
 	rd.data = buffer
-	return buffer, err
+	return buffer, nil
 }
 
 func (wr *IOWriter) Write(data []byte) error {
-	fmt.Print(string(data))
-	return nil
+	_, err := os.Stdout.Write(data)
+
+	if err != nil {
+		return fmt.Errorf("ошибка при записи в файл %w", err)
+	}
+	return err
+
 }
 
 type FileReader struct {
@@ -94,13 +93,15 @@ type FileWriter struct {
 }
 
 func (fr *FileReader) Read() ([]byte, error) {
-	var err error
 
 	exPath, _ := os.Getwd()
 	fileName := exPath + "\\" + fr.opts.From
 
-	inputFile, _ := os.Open(fileName)
-	// todo: добавить wrapper
+	inputFile, openErr := os.OpenFile(fileName, os.O_RDONLY, 0644)
+	if openErr != nil {
+		return nil, fmt.Errorf("ошибка при открытии файла ввода %w", openErr)
+	}
+
 	defer inputFile.Close()
 
 	buffer := []byte{}
@@ -112,13 +113,13 @@ func (fr *FileReader) Read() ([]byte, error) {
 
 		n, readErr := inputFile.Read(chunkBuffer)
 		if readErr != nil && readErr != io.EOF {
-			break
+			return nil, fmt.Errorf("ошибка чтения из файла ввода %w", readErr)
 		}
 
 		bytesReaded += n
 		for i := 0; i < n; i++ {
 			buffer = append(buffer, chunkBuffer[i])
-		}
+		} //TODO: заменить на срез
 
 		if readErr == io.EOF {
 			break
@@ -127,20 +128,25 @@ func (fr *FileReader) Read() ([]byte, error) {
 	}
 	buffer = buffer[fr.opts.Offset:]
 	fr.data = buffer
-	return buffer, err
+	return buffer, nil
 }
 
 func (fw *FileWriter) Write(data []byte) error {
 	filePath, _ := os.Getwd()
 	fileName := filePath + "\\" + fw.opts.To
 
-	file, _ := os.OpenFile(fileName, os.O_RDWR|os.O_CREATE, 0755)
-	// TODO: add wrapper
+	file, openErr := os.OpenFile(fileName, os.O_CREATE|os.O_EXCL, 0755)
+	if openErr != nil {
+		return fmt.Errorf("ошибка при открытии файла вывода %w", openErr)
+	}
 	defer file.Close()
 
-	_, err := file.Write(data)
+	_, writeErr := file.Write(data)
+	if writeErr != nil {
+		return fmt.Errorf("ошибка при записи в файл вывода %w", writeErr)
+	}
 
-	return err
+	return nil
 }
 
 func ParseFlags() (*Options, error) {
@@ -186,7 +192,10 @@ func main() {
 		reader = &FileReader{opts: opts}
 	}
 
-	data, _ := reader.Read()
+	data, readErr := reader.Read()
+	if readErr != nil {
+		panic(readErr)
+	}
 
 	var writer Writer
 	if opts.To == "" {
@@ -195,6 +204,9 @@ func main() {
 		writer = &FileWriter{opts: opts}
 	}
 
-	writer.Write(data)
+	writeErr := writer.Write(data)
+	if writeErr != nil {
+		panic(writeErr)
+	}
 
 }
