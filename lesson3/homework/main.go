@@ -169,7 +169,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	fmt.Println(opts, err)
+	// fmt.Println(opts, err)
 
 	// var IOReader Reader = IOReader{opts}
 	// buffer, err := IOReader.Read(5, 10)
