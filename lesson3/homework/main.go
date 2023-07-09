@@ -73,6 +73,10 @@ func (rd IOReader) Read(limit int, offset int) ([]byte, error) {
 	return buffer, err
 }
 
+func (rw IOWriter) Write(bytes []byte) {
+	fmt.Print(string(bytes))
+}
+
 type FileReader struct {
 	opts *Options
 }
