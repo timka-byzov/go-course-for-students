@@ -32,25 +32,30 @@ const (
 // }
 
 type Reader interface {
-	Read(bcount int, oofset int) ([]byte, error)
+	Read() ([]byte, error)
 }
 
 type Writer interface {
-	Write([]byte)
+	Write([]byte) error
 }
 
 type IOReader struct {
 	opts *Options
+	data []byte
 }
 
-func (rd IOReader) Read(limit int, offset int) ([]byte, error) {
+type IOWriter struct {
+	opts *Options
+}
+
+func (rd *IOReader) Read() ([]byte, error) {
 	var err error
 
 	buffer := []byte{}
 	bytesReaded := 0
 	endLine := false
 
-	for (bytesReaded < limit+offset || limit == -1) && !endLine {
+	for (rd.opts.Limit == -1 || bytesReaded < rd.opts.Limit+rd.opts.Offset) && !endLine {
 		chunkBuffer := make([]byte, rd.opts.BlockSize)
 		n, readErr := os.Stdin.Read(chunkBuffer)
 		if err != nil {
@@ -69,31 +74,39 @@ func (rd IOReader) Read(limit int, offset int) ([]byte, error) {
 		}
 	}
 
-	buffer = buffer[offset:]
+	buffer = buffer[rd.opts.Offset:]
+	rd.data = buffer
 	return buffer, err
 }
 
-func (rw IOWriter) Write(bytes []byte) {
-	fmt.Print(string(bytes))
+func (wr *IOWriter) Write(data []byte) error {
+	fmt.Print(string(data))
+	return nil
 }
 
 type FileReader struct {
 	opts *Options
+	data []byte
 }
 
-func (fr FileReader) Read(limit int, offset int) ([]byte, error) {
+type FileWriter struct {
+	opts *Options
+}
+
+func (fr *FileReader) Read() ([]byte, error) {
 	var err error
 
 	exPath, _ := os.Getwd()
-	fileName := exPath + "\\" + "in.txt"
+	fileName := exPath + "\\" + fr.opts.From
 
-	inputFile, err := os.Open(fileName)
+	inputFile, _ := os.Open(fileName)
 	// todo: добавить wrapper
+	defer inputFile.Close()
 
 	buffer := []byte{}
 	bytesReaded := 0
 
-	for bytesReaded < limit+offset || limit == -1 {
+	for fr.opts.Limit == -1 || bytesReaded < fr.opts.Limit+fr.opts.Offset {
 
 		chunkBuffer := make([]byte, fr.opts.BlockSize)
 
@@ -104,9 +117,6 @@ func (fr FileReader) Read(limit int, offset int) ([]byte, error) {
 
 		bytesReaded += n
 		for i := 0; i < n; i++ {
-			if chunkBuffer[i] == EndLine || chunkBuffer[i] == Empty || chunkBuffer[i] == CarriegeReturn {
-				break
-			}
 			buffer = append(buffer, chunkBuffer[i])
 		}
 
@@ -115,7 +125,22 @@ func (fr FileReader) Read(limit int, offset int) ([]byte, error) {
 		}
 
 	}
+	buffer = buffer[fr.opts.Offset:]
+	fr.data = buffer
 	return buffer, err
+}
+
+func (fw *FileWriter) Write(data []byte) error {
+	filePath, _ := os.Getwd()
+	fileName := filePath + "\\" + fw.opts.To
+
+	file, _ := os.OpenFile(fileName, os.O_RDWR|os.O_CREATE, 0755)
+	// TODO: add wrapper
+	defer file.Close()
+
+	_, err := file.Write(data)
+
+	return err
 }
 
 func ParseFlags() (*Options, error) {
@@ -129,7 +154,7 @@ func ParseFlags() (*Options, error) {
 	flag.IntVar(&opts.BlockSize, "block-size", DBlockSize, "Block-size")
 	flag.StringVar(&conversions, "conv", "", "Conversions")
 
-	// todo: parse and validate all flags
+	// TODO: parse and validate all flags
 
 	flag.Parse()
 	opts.Convesrions = strings.Split(conversions, ", ")
@@ -150,9 +175,26 @@ func main() {
 	// buffer, err := IOReader.Read(5, 10)
 	// fmt.Println(string(buffer), err)
 
-	var fileReader Reader = FileReader{opts}
-	buffer, err := fileReader.Read(2, 0)
-	fmt.Println(string(buffer), err)
+	// var fileReader Reader = FileReader{opts}
+	// buffer, err := fileReader.Read(2, 0)
+	// fmt.Println(string(buffer), err)
 
-	// todo: implement the functional requirements described in read.me
+	var reader Reader
+	if opts.From == "" {
+		reader = &IOReader{opts: opts}
+	} else {
+		reader = &FileReader{opts: opts}
+	}
+
+	data, _ := reader.Read()
+
+	var writer Writer
+	if opts.To == "" {
+		writer = &IOWriter{opts: opts}
+	} else {
+		writer = &FileWriter{opts: opts}
+	}
+
+	writer.Write(data)
+
 }
