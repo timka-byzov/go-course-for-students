@@ -16,14 +16,22 @@ type Options struct {
 	Convesrions []string
 }
 
+const (
+	DBlockSize int = 2
+)
+
+const (
+	EndLine        byte = 0xa
+	CarriegeReturn byte = 0xd
+	Empty          byte = 0x0
+)
+
 // type BlockReader interface{
 // 	ReadBlock()
 // }
 
 type Reader interface {
-	LimitRead(bcount int) ([]byte, error)
-	UnlimitRead() ([]byte, error)
-	OffsetRead(bcount int) error
+	Read(bcount int, oofset int) ([]byte, error)
 }
 
 type Writer interface {
@@ -36,53 +44,44 @@ type IOReader struct {
 	Limit     int
 }
 
-func (rd IOReader) OffsetRead(bcount int) error {
-	var err error
-
-	for {
-		n, err := os.Stdin.Read(make([]byte, rd.BlockSize))
-		if err != nil {
-			break
-		}
-
-		if n < rd.BlockSize {
-			break
-		}
-
-	}
-	// fmt.Println(err)
-	return err
-}
-
-func (rd IOReader) LimitRead(bcount int) ([]byte, error) {
+func (rd IOReader) Read(limit int, offset int) ([]byte, error) {
 	var err error
 
 	buffer := []byte{}
-	for {
+	bytesReaded := 0
+	endLine := false
+
+	for (bytesReaded < limit+offset || limit == -1) && !endLine {
 		chunkBuffer := make([]byte, rd.BlockSize)
 		n, err := os.Stdin.Read(chunkBuffer)
-
-		buffer = append(buffer, chunkBuffer...)
-
 		if err != nil {
 			break
 		}
 
-		if n < rd.BlockSize {
-			break
-		}
+		bytesReaded += n
 
+		for i := 0; i < n; i++ {
+			if chunkBuffer[i] == EndLine || chunkBuffer[i] == Empty || chunkBuffer[i] == CarriegeReturn {
+				endLine = true
+				break
+			}
+			buffer = append(buffer, chunkBuffer[i])
+		}
 	}
 
+	buffer = buffer[offset:]
 	return buffer, err
-
 }
 
-func (rd IOReader) UnlimitRead() ([]byte, error) {
-	return []byte{}, nil
-}
+// type FileReader struct {
+// 	IOReader
+// 	ifName string
+// 	ofname string
+// }
 
-type FileReader struct{}
+// func (fr FileReader) OffsetRead(offset int) {
+
+// }
 
 func ParseFlags() (*Options, error) {
 	var opts Options
@@ -92,7 +91,7 @@ func ParseFlags() (*Options, error) {
 	flag.StringVar(&opts.To, "to", "", "file to write. by default - stdout")
 	flag.IntVar(&opts.Offset, "offset", 0, "Offset")
 	flag.IntVar(&opts.Limit, "limit", -1, "Limit")
-	flag.IntVar(&opts.BlockSize, "block-size", 0, "Block-size")
+	flag.IntVar(&opts.BlockSize, "block-size", DBlockSize, "Block-size")
 	flag.StringVar(&conversions, "conv", "", "Conversions")
 
 	// todo: parse and validate all flags
@@ -111,9 +110,10 @@ func main() {
 	}
 
 	fmt.Println(opts, err)
-	var IOReader Reader = IOReader{BlockSize: opts.BlockSize, Offset: opts.Offset, Limit: opts.Limit}
 
-	IOReader.OffsetRead(2)
+	var IOReader Reader = IOReader{BlockSize: opts.BlockSize, Offset: opts.Offset, Limit: opts.Limit}
+	buffer, err := IOReader.Read(5, 10)
+	fmt.Println(string(buffer), err)
 
 	// todo: implement the functional requirements described in read.me
 }
