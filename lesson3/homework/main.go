@@ -1,11 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
 	"io"
 	"os"
 	"strings"
+	"unicode"
 )
 
 type Options struct {
@@ -117,9 +119,7 @@ func (fr *FileReader) Read() ([]byte, error) {
 		}
 
 		bytesReaded += n
-		for i := 0; i < n; i++ {
-			buffer = append(buffer, chunkBuffer[i])
-		} //TODO: заменить на срез
+		buffer = append(buffer, chunkBuffer[:n]...)
 
 		if readErr == io.EOF {
 			break
@@ -163,9 +163,45 @@ func ParseFlags() (*Options, error) {
 	// TODO: parse and validate all flags
 
 	flag.Parse()
-	opts.Convesrions = strings.Split(conversions, ", ")
+	opts.Convesrions = strings.Split(conversions, ",")
 
 	return &opts, nil
+}
+
+type Conversion struct {
+	convFunc map[string]func([]byte) []byte
+}
+
+func (cv Conversion) ApplyConversion(conversionName string, b []byte) ([]byte, error) {
+	f, ok := cv.convFunc[conversionName]
+	if ok {
+		return f(b), nil
+	}
+	return nil, fmt.Errorf("нет такого преобразования %s", conversionName)
+}
+
+func Trim(b []byte) []byte {
+	i := 0
+	j := len(b) - 1
+	for ; i < len(b) && unicode.IsSpace(rune(b[i])); i++ {
+	}
+	for ; j >= i && unicode.IsSpace(rune(b[j])); j-- {
+	}
+	return b[i : j+1]
+}
+
+func NewConverison() Conversion {
+	convFunc := map[string]func([]byte) []byte{
+		"upper_case": func(b []byte) []byte {
+			return bytes.ToUpper(b)
+		},
+		"lower_case": func(b []byte) []byte {
+			return bytes.ToLower(b)
+		},
+		"trim": Trim,
+	}
+
+	return Conversion{convFunc}
 }
 
 func main() {
@@ -202,6 +238,14 @@ func main() {
 		writer = &IOWriter{opts: opts}
 	} else {
 		writer = &FileWriter{opts: opts}
+	}
+
+	conversion := NewConverison()
+	for _, conv := range opts.Convesrions {
+		data, err = conversion.ApplyConversion(conv, data)
+		if err != nil {
+			panic(err)
+		}
 	}
 
 	writeErr := writer.Write(data)
