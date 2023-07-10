@@ -144,7 +144,7 @@ func (fr *FileReader) Read() ([]byte, error) {
 
 func (fw *FileWriter) Write(data []byte) error {
 	filePath, _ := os.Getwd()
-	fileName := filePath + "\\" + fw.opts.To
+	fileName := filePath + "/" + fw.opts.To
 
 	file, openErr := os.OpenFile(fileName, os.O_CREATE|os.O_EXCL, 0755)
 	if openErr != nil {
