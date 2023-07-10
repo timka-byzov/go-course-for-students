@@ -108,7 +108,7 @@ type FileWriter struct {
 func (fr *FileReader) Read() ([]byte, error) {
 
 	exPath, _ := os.Getwd()
-	fileName := exPath + "\\" + fr.opts.From
+	fileName := exPath + "/" + fr.opts.From
 
 	inputFile, openErr := os.OpenFile(fileName, os.O_RDONLY, 0644)
 	if openErr != nil {
