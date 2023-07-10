@@ -146,7 +146,7 @@ func (fw *FileWriter) Write(data []byte) error {
 	filePath, _ := os.Getwd()
 	fileName := filePath + "/" + fw.opts.To
 
-	file, openErr := os.OpenFile(fileName, os.O_CREATE|os.O_EXCL, 0755)
+	file, openErr := os.OpenFile(fileName, os.O_CREATE|os.O_EXCL, 0644)
 	if openErr != nil {
 		return fmt.Errorf("ошибка при открытии файла вывода %w", openErr)
 	}
