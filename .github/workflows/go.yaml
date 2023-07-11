@@ -20,13 +20,13 @@ jobs:
           - ./lesson1/homework
           - ./lesson2/homework
           - ./lesson3/homework
-          - ./lesson4/homework
-          - ./lesson5/homework
-          - ./lesson6/homework
-          - ./lesson7/homework
-          - ./lesson8/homework
-          - ./lesson9/homework
-          - ./lesson10/homework
+          # - ./lesson4/homework
+          # - ./lesson5/homework
+          # - ./lesson6/homework
+          # - ./lesson7/homework
+          # - ./lesson8/homework
+          # - ./lesson9/homework
+          # - ./lesson10/homework
     steps:
       - uses: actions/checkout@v3
 

@@ -108,7 +108,7 @@ type FileWriter struct {
 func (fr *FileReader) Read() ([]byte, error) {
 
 	exPath, _ := os.Getwd()
-	fileName := exPath + "\\" + fr.opts.From
+	fileName := exPath + "/" + fr.opts.From
 
 	inputFile, openErr := os.OpenFile(fileName, os.O_RDONLY, 0644)
 	if openErr != nil {
@@ -145,9 +145,9 @@ func (fr *FileReader) Read() ([]byte, error) {
 func (fw *FileWriter) Write(data []byte) error {
 	//TODO: добавить чанк запись
 	filePath, _ := os.Getwd()
-	fileName := filePath + "\\" + fw.opts.To
+	fileName := filePath + "/" + fw.opts.To
 
-	file, openErr := os.OpenFile(fileName, os.O_CREATE|os.O_EXCL, 0755)
+	file, openErr := os.OpenFile(fileName, os.O_CREATE|os.O_EXCL, 0644)
 	if openErr != nil {
 		return fmt.Errorf("ошибка при открытии файла вывода %w", openErr)
 	}
