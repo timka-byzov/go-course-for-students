@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"unicode"
 )
@@ -142,20 +143,40 @@ func (fr *FileReader) Read() ([]byte, error) {
 	return buffer, nil
 }
 
-func (fw *FileWriter) Write(data []byte) error {
-	//TODO: добавить чанк запись
+func OpenDirFile(fileName string) (*os.File, error) {
 	filePath, _ := os.Getwd()
-	fileName := filePath + "/" + fw.opts.To
-
-	file, openErr := os.OpenFile(fileName, os.O_CREATE|os.O_EXCL, 0644)
+	filePath = filepath.Join(filePath, fileName)
+	file, openErr := os.OpenFile(filePath, os.O_CREATE|os.O_EXCL, 0644)
 	if openErr != nil {
-		return fmt.Errorf("ошибка при открытии файла вывода %w", openErr)
+		return nil, fmt.Errorf("ошибка при открытии файла вывода %w", openErr)
 	}
 	defer file.Close()
 
-	_, writeErr := file.Write(data)
-	if writeErr != nil {
-		return fmt.Errorf("ошибка при записи в файл вывода %w", writeErr)
+	return file, nil
+}
+
+func (fw *FileWriter) Write(data []byte) error {
+	//TODO: добавить чанк запись
+	file, openErr := OpenDirFile(fw.opts.To)
+
+	if openErr != nil {
+		return openErr
+	}
+
+	writePointer := 0
+	dataLen := len(data)
+	for writePointer < len(data) {
+		currBlockSize := fw.opts.BlockSize
+		if dataLen-writePointer < currBlockSize {
+			currBlockSize = dataLen - writePointer
+		}
+		chunk := data[writePointer : writePointer+currBlockSize]
+		_, writeErr := file.Write(chunk)
+
+		if writeErr != nil {
+			return fmt.Errorf("ошибка при записи в файл вывода %w", writeErr)
+		}
+		writePointer += currBlockSize
 	}
 
 	return nil
