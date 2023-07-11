@@ -143,6 +143,7 @@ func (fr *FileReader) Read() ([]byte, error) {
 }
 
 func (fw *FileWriter) Write(data []byte) error {
+	//TODO: добавить чанк запись
 	filePath, _ := os.Getwd()
 	fileName := filePath + "\\" + fw.opts.To
 
