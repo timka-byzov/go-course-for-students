@@ -20,7 +20,7 @@ jobs:
           - ./lesson1/homework
           - ./lesson2/homework
           - ./lesson3/homework
-          # - ./lesson4/homework
+          - ./lesson4/homework
           # - ./lesson5/homework
           # - ./lesson6/homework
           # - ./lesson7/homework
