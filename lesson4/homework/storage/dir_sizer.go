@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	maxWorkersCount = 3
+	maxWorkersCount = 10
 )
 
 type Result struct {
@@ -22,7 +22,7 @@ type DirSizer interface {
 // sizer implement the DirSizer interface
 type sizer struct {
 	maxWorkersCount int
-	workerPool      chan struct{}
+	workerCh        chan struct{}
 }
 
 // NewSizer returns new DirSizer instance
@@ -32,20 +32,25 @@ func NewSizer() DirSizer {
 
 func (a *sizer) Size(ctx context.Context, d Dir) (Result, error) {
 	ch := make(chan File, 1000)
-
+	errCh := make(chan error, 1)
 	totalSize := int64(0)
 	count := int64(0)
 
 	go func() {
 		defer close(ch)
-		a.RecursiveSize(ctx, d, ch)
+		a.RecursiveSize(ctx, d, ch, errCh)
 	}()
 
-	for f := range ch {
+	for {
 		select {
 		case <-ctx.Done():
 			return Result{}, ctx.Err()
-		default:
+		case err := <-errCh:
+			return Result{}, err
+		case f, ok := <-ch:
+			if !ok {
+				return Result{Size: totalSize, Count: count}, nil
+			}
 			count++
 			size, err := f.Stat(ctx)
 			if err != nil {
@@ -54,13 +59,12 @@ func (a *sizer) Size(ctx context.Context, d Dir) (Result, error) {
 			totalSize += size
 		}
 	}
-
-	return Result{Size: totalSize, Count: count}, nil
 }
 
-func (a *sizer) RecursiveSize(ctx context.Context, d Dir, ch chan File) {
+func (a *sizer) RecursiveSize(ctx context.Context, d Dir, ch chan File, errCh chan error) {
 	dirs, files, err := d.Ls(ctx)
 	if err != nil {
+		errCh <- err
 		return
 	}
 
@@ -75,13 +79,13 @@ func (a *sizer) RecursiveSize(ctx context.Context, d Dir, ch chan File) {
 	var wg sync.WaitGroup
 	for _, d := range dirs {
 		wg.Add(1)
-		a.workerPool <- struct{}{} // Запрашиваем доступ к горутине из пула
+		a.workerCh <- struct{}{}
 		go func(dir Dir) {
 			defer func() {
 				wg.Done()
-				<-a.workerPool // Освобождаем горутину в пуле
+				<-a.workerCh
 			}()
-			a.RecursiveSize(ctx, dir, ch)
+			a.RecursiveSize(ctx, dir, ch, errCh)
 		}(d)
 	}
 	wg.Wait()
